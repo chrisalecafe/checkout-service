@@ -52,6 +52,8 @@ export default function LoginPage() {
             <Input
               label="Email"
               type="email"
+              variant="bordered"
+              classNames={{ inputWrapper: 'border-default-400' }}
               value={email}
               onValueChange={setEmail}
               isInvalid={!!fieldErrors.email}
@@ -61,6 +63,8 @@ export default function LoginPage() {
             <Input
               label="Password"
               type="password"
+              variant="bordered"
+              classNames={{ inputWrapper: 'border-default-400' }}
               value={password}
               onValueChange={setPassword}
               isInvalid={!!fieldErrors.password}

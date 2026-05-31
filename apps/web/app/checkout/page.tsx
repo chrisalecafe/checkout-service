@@ -121,6 +121,8 @@ export default function CheckoutPage() {
                     <Input
                       label="Item name"
                       size="sm"
+                      variant="bordered"
+                      classNames={{ inputWrapper: 'border-default-400' }}
                       value={item.name}
                       onValueChange={v => updateItem(idx, 'name', v)}
                       isInvalid={!!itemErrors[idx]?.name}
@@ -132,6 +134,8 @@ export default function CheckoutPage() {
                     <Input
                       label="Price"
                       size="sm"
+                      variant="bordered"
+                      classNames={{ inputWrapper: 'border-default-400' }}
                       type="number"
                       min="0.01"
                       step="0.01"
@@ -146,6 +150,8 @@ export default function CheckoutPage() {
                     <Input
                       label="Qty"
                       size="sm"
+                      variant="bordered"
+                      classNames={{ inputWrapper: 'border-default-400' }}
                       type="number"
                       min="1"
                       step="1"
