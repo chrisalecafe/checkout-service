@@ -1,0 +1,28 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+RUN npm i -g pnpm
+
+# Copy workspace manifests first for layer caching
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/web/package.json ./apps/web/
+
+RUN pnpm install --frozen-lockfile --filter @checkout/web
+
+COPY apps/web ./apps/web
+
+RUN pnpm --filter @checkout/web build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+RUN addgroup -S app && adduser -S app -G app
+
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./.next/static
+COPY --from=builder /app/apps/web/public ./public
+
+USER app
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:3000/ || exit 1
+CMD ["node", "server.js"]
