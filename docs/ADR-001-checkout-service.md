@@ -66,7 +66,7 @@ apps/web/
 |-------------|----------|-----------------|----------|
 | MVP         | Railway  | Supabase (free) | Vercel   |
 | AWS         | ECS      | RDS             | CloudFront |
-| GCP         | Cloud Run| Cloud SQL       | Firebase Hosting |
+| GCP         | Cloud Run| Supabase        | Cloud Run |
 
 Switching stacks requires only env var changes.
 

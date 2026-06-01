@@ -76,12 +76,12 @@ sequenceDiagram
     participant PE as PricingEngine (domain)
     participant R  as CheckoutRepository
 
-    C->>+G: POST /checkout<br/>Authorization: Bearer &lt;token&gt;
+    C->>+G: "POST /checkout (Bearer token)"
     G->>G: jwt.verify(token)
     G->>+CC: req.user.userId
     CC->>+UC: execute(userId, items)
     UC->>+PE: calculateCheckout(items, config)
-    PE-->>-UC: subtotal · taxes · discount · total
+    PE-->>-UC: subtotal, taxes, discount, total
     UC->>+R: save(session)
     R-->>-UC: CheckoutSession
     UC-->>-CC: CheckoutResult
@@ -265,7 +265,7 @@ The smoke test step starts the real Docker image and retries `curl` five times b
 
 ### CD Pipeline (`.github/workflows/cd.yml`)
 
-Triggered on every push to `main` (after CI passes). Deploys to **GCP Cloud Run** using Workload Identity Federation (no long-lived credentials stored as secrets).
+Triggered by `workflow_run` on CI **completing successfully** — CD never starts if CI fails or is skipped. Deploys to **GCP Cloud Run** using Workload Identity Federation (no long-lived credentials stored as secrets).
 
 ```mermaid
 flowchart LR
@@ -307,5 +307,5 @@ Switch targets by changing environment variables only — zero code changes requ
 | Layer | Local | MVP | AWS | GCP |
 |-------|-------|-----|-----|-----|
 | API | Docker Compose | Railway | ECS Fargate | Cloud Run |
-| DB | Postgres container | Supabase | RDS | Cloud SQL |
-| Frontend | Docker Compose | Vercel | CloudFront | Firebase Hosting |
+| DB | Postgres container | Supabase | RDS | Supabase |
+| Frontend | Docker Compose | Vercel | CloudFront | Cloud Run |

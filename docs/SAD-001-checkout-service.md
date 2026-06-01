@@ -380,7 +380,7 @@ graph TD
     linkStyle 1 stroke:#10b981,stroke-width:2px;
 ```
 
-### 8.2 GCP Production Deployment (Terraform)
+### 8.2 GCP Production Deployment
 
 When deploying to Google Cloud Platform, the configuration uses containerized services on **Google Cloud Run** for both layers, combined with **Supabase** for fully managed PostgreSQL data and Authentication:
 

@@ -30,26 +30,42 @@ GitHub Actions CI
 
 2. **Supabase project** — free tier is sufficient for MVP.
 
-3. **Terraform** ≥ 1.7 and **gcloud CLI** installed locally.
+3. **gcloud CLI** installed locally.
 
 ---
 
 ## First-time setup
 
-### 1. Create the Terraform state bucket
+### 1. Create the Artifact Registry repository
+
+Run the following command to create the Docker registry in GCP for your build images:
 
 ```bash
-gsutil mb -p <PROJECT_ID> -l us-central1 gs://checkout-tfstate
-gsutil versioning set on gs://checkout-tfstate
+PROJECT=your-gcp-project-id
+REGION=us-central1
+
+gcloud artifacts repositories create checkout \
+  --repository-format=docker \
+  --location=$REGION \
+  --description="Checkout Service Docker images" \
+  --project=$PROJECT
 ```
 
-### 2. Populate secrets in Secret Manager
+### 2. Create and Populate secrets in Secret Manager
 
-Run once after `terraform apply` creates the secret shells:
+Create the secret shells in GCP and add their initial values:
 
 ```bash
 PROJECT=your-gcp-project-id
 
+# 1. Create the secret placeholders
+gcloud secrets create checkout-database-url --replication-policy="automatic" --project=$PROJECT
+gcloud secrets create checkout-supabase-jwt-secret --replication-policy="automatic" --project=$PROJECT
+gcloud secrets create checkout-supabase-url --replication-policy="automatic" --project=$PROJECT
+gcloud secrets create checkout-supabase-service-role-key --replication-policy="automatic" --project=$PROJECT
+gcloud secrets create checkout-jwt-secret --replication-policy="automatic" --project=$PROJECT
+
+# 2. Add secret values
 # Supabase connection string (Settings → Database → Connection string → URI)
 echo -n "postgresql://postgres:<password>@<host>:5432/postgres?sslmode=require" \
   | gcloud secrets versions add checkout-database-url --data-file=- --project=$PROJECT
@@ -70,6 +86,8 @@ echo -n "$(openssl rand -base64 32)" \
 ```
 
 ### 3. Configure Workload Identity Federation for GitHub Actions
+
+Configure GCP Workload Identity Pools so GitHub Actions can deploy without long-lived credentials:
 
 ```bash
 PROJECT=your-gcp-project-id
@@ -118,7 +136,7 @@ gcloud iam service-accounts add-iam-policy-binding \
 
 ### 4. Add GitHub Actions secrets
 
-In your GitHub repo → Settings → Secrets → Actions:
+In your GitHub repo → Settings → Secrets → Actions, configure the deployment targets:
 
 | Secret | Value |
 |--------|-------|
@@ -126,18 +144,6 @@ In your GitHub repo → Settings → Secrets → Actions:
 | `GCP_REGION` | `us-central1` |
 | `GCP_SERVICE_ACCOUNT` | `github-deploy@<PROJECT>.iam.gserviceaccount.com` |
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | Output of `gcloud iam workload-identity-pools providers describe github-provider ...` |
-
-### 5. Apply Terraform
-
-```bash
-cd infra/terraform/environments/production
-cp terraform.tfvars.example terraform.tfvars
-# edit terraform.tfvars
-
-terraform init
-terraform plan
-terraform apply
-```
 
 ---
 

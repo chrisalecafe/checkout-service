@@ -69,6 +69,7 @@ export class SupabaseAuthAdapter implements IAuthProvider {
     if (error || !data.user) throw new UnauthorizedException();
 
     // Re-sign by generating a new session via admin API
+    if (!data.user.email) throw new UnauthorizedException();
     const { data: sessionData, error: sessionError } =
       await this.client.auth.admin.generateLink({ type: 'magiclink', email: data.user.email });
     if (sessionError) throw new UnauthorizedException();

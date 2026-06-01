@@ -9,6 +9,15 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  @@map("users")
+}
+
 model CheckoutSession {
   id         String   @id @default(uuid()) @db.Uuid
   user_id    String

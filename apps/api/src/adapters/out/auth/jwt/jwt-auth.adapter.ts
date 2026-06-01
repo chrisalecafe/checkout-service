@@ -1,18 +1,27 @@
-import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { IAuthProvider } from '@ports/out/auth.provider.port';
+import { PrismaService } from '@adapters/out/db/prisma/prisma.service';
 
 const BCRYPT_COST = 12;
+
+/** Minimal shape of the Prisma user delegate needed by this adapter. */
+interface UserRecord { id: string; email: string; password: string; }
+interface PrismaUserClient {
+  user: {
+    findUnique(args: { where: { email: string } }): Promise<UserRecord | null>;
+    create(args: { data: { id: string; email: string; password: string } }): Promise<UserRecord>;
+  };
+}
 
 @Injectable()
 export class JwtAuthAdapter implements IAuthProvider {
   private readonly secret: string;
   private readonly logger = new Logger(JwtAuthAdapter.name);
-  private readonly users = new Map<string, { id: string; email: string; passwordHash: string }>();
 
-  constructor() {
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaUserClient) {
     const secret = process.env.JWT_SECRET;
     if (!secret || secret.length < 32) {
       throw new Error('JWT_SECRET env var must be set and at least 32 characters long.');
@@ -21,27 +30,26 @@ export class JwtAuthAdapter implements IAuthProvider {
   }
 
   async register(email: string, password: string): Promise<{ userId: string }> {
-    for (const u of this.users.values()) {
-      if (u.email === email) throw new ConflictException('Email already registered');
-    }
-    const userId = randomUUID();
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) throw new ConflictException('Email already registered');
+
+    const id = randomUUID();
     const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
-    this.users.set(userId, { id: userId, email, passwordHash });
-    this.logger.log(`User registered: ${userId}`);
-    return { userId };
+    const created = await this.prisma.user.create({
+      data: { id, email, password: passwordHash },
+    });
+    this.logger.log(`User registered: ${created.id}`);
+    return { userId: created.id };
   }
 
   async verifyCredentials(email: string, password: string): Promise<{ userId: string }> {
-    let found: { id: string; email: string; passwordHash: string } | undefined;
-    for (const u of this.users.values()) {
-      if (u.email === email) { found = u; break; }
-    }
-    if (!found || !(await bcrypt.compare(password, found.passwordHash))) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       this.logger.warn('Failed login attempt');
       throw new UnauthorizedException('Invalid credentials');
     }
-    this.logger.log(`Successful login for user: ${found.id}`);
-    return { userId: found.id };
+    this.logger.log(`Successful login for user: ${user.id}`);
+    return { userId: user.id };
   }
 
   async issueToken(userId: string): Promise<{ access_token: string; expires_in: number }> {

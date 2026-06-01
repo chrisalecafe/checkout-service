@@ -81,8 +81,8 @@ Steps: install → lint → test (postgres service container) → build → dock
 | Layer    | MVP              | AWS          | GCP             |
 |----------|------------------|--------------|-----------------|
 | API      | Railway          | ECS Fargate  | Cloud Run       |
-| DB       | Supabase         | RDS          | Cloud SQL       |
-| Frontend | Vercel           | CloudFront   | Firebase Hosting|
+| DB       | Supabase         | RDS          | Supabase        |
+| Frontend | Vercel           | CloudFront   | Cloud Run       |
 
 Switching targets: env vars only, zero code changes.
 
