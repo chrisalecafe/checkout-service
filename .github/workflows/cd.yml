@@ -76,7 +76,7 @@ jobs:
             --region ${{ secrets.GCP_REGION }} \
             --set-secrets "DATABASE_URL=checkout-database-url:latest,DIRECT_URL=checkout-direct-url:latest" \
             --command "node" \
-            --args "node_modules/prisma/build/index.js,migrate,deploy,--schema,apps/api/prisma/schema.prisma" \
+            --args "apps/api/node_modules/prisma/build/index.js,migrate,deploy,--schema,apps/api/prisma/schema.prisma" \
             --execute-now \
             --wait
           gcloud run jobs delete checkout-migrate-${{ github.run_number }} \
