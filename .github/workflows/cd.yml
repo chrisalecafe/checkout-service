@@ -91,7 +91,7 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --set-secrets "DATABASE_URL=checkout-database-url:latest,JWT_SECRET=checkout-jwt-secret:latest" \
-            --set-env-vars "DB_PROVIDER=postgres,AUTH_PROVIDER=jwt,PORT=4000,DB_SSL=true,SHELL_ORIGIN=${{ secrets.WEB_URL }}"
+            --set-env-vars "DB_PROVIDER=postgres,AUTH_PROVIDER=jwt,DB_SSL=true,SHELL_ORIGIN=${{ secrets.WEB_URL }}"
 
   # ── Web — build and deploy ────────────────────────────────────────────────────
   deploy-web:

@@ -39,5 +39,5 @@ RUN addgroup -S app && adduser -S app -G app
 USER app
 
 EXPOSE 4000
-HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:4000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:${PORT:-4000}/health || exit 1
 CMD ["node", "apps/api/dist/main.js"]
