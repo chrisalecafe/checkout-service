@@ -90,8 +90,8 @@ jobs:
             --region ${{ secrets.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-secrets "DATABASE_URL=checkout-database-url:latest,JWT_SECRET=checkout-jwt-secret:latest" \
-            --set-env-vars "DB_PROVIDER=postgres,AUTH_PROVIDER=jwt,DB_SSL=true,SHELL_ORIGIN=${{ secrets.WEB_URL }}"
+            --set-secrets "DATABASE_URL=checkout-database-url:latest,JWT_SECRET=checkout-jwt-secret:latest,SUPABASE_URL=checkout-supabase-url:latest,SUPABASE_SERVICE_ROLE_KEY=checkout-supabase-service-role-key:latest" \
+            --set-env-vars "DB_PROVIDER=postgres,AUTH_PROVIDER=supabase,DB_SSL=true,SHELL_ORIGIN=${{ secrets.WEB_URL }}"
 
   # ── Web — build and deploy ────────────────────────────────────────────────────
   deploy-web:
