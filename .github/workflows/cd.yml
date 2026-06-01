@@ -25,8 +25,8 @@ jobs:
         run: |
           git diff --name-only HEAD~1 HEAD > changed.txt
           cat changed.txt
-          echo "api=$(grep -qE '^apps/api/|^prisma/' changed.txt && echo true || echo false)" >> $GITHUB_OUTPUT
-          echo "web=$(grep -qE '^apps/web/' changed.txt && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "api=$(grep -qE '^apps/api/|^prisma/|^\.github/' changed.txt && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "web=$(grep -qE '^apps/web/|^\.github/' changed.txt && echo true || echo false)" >> $GITHUB_OUTPUT
 
   # ── API — build, migrate, deploy ─────────────────────────────────────────────
   deploy-api:
@@ -89,6 +89,7 @@ jobs:
             --image "${{ env.REGISTRY }}/api:${{ env.SHA }}" \
             --region ${{ secrets.GCP_REGION }} \
             --platform managed \
+            --allow-unauthenticated \
             --set-secrets "DATABASE_URL=checkout-database-url:latest,JWT_SECRET=checkout-jwt-secret:latest" \
             --set-env-vars "DB_PROVIDER=postgres,AUTH_PROVIDER=jwt,PORT=4000,DB_SSL=true,SHELL_ORIGIN=${{ secrets.WEB_URL }}"
 
@@ -139,4 +140,5 @@ jobs:
             --image "${{ env.REGISTRY }}/web:${{ env.SHA }}" \
             --region ${{ secrets.GCP_REGION }} \
             --platform managed \
+            --allow-unauthenticated \
             --set-env-vars "NODE_ENV=production"
