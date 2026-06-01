@@ -7,6 +7,7 @@ RUN npm i -g pnpm
 # Copy workspace manifests first for layer caching
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
 COPY apps/api/prisma ./apps/api/prisma
 
 RUN pnpm install --frozen-lockfile --filter @checkout/api
@@ -25,6 +26,7 @@ RUN npm i -g pnpm
 # Install production deps — packages land in /app/apps/api/node_modules
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
 COPY apps/api/prisma ./apps/api/prisma
 
 RUN pnpm install --frozen-lockfile --filter @checkout/api --prod
