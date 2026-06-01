@@ -157,7 +157,9 @@ jobs:
             -e PORT="4000" \
             -e NODE_ENV="test" \
             checkout-api:ci
-          # Wait for the container to be ready, retrying on connection refused too
-          curl --retry 15 --retry-delay 2 --retry-connrefused --fail http://localhost:4000/health || \
+          # Wait for the container to be ready.
+          # --retry-all-errors covers both ECONNREFUSED (7) and ECONNRESET (56),
+          # which occurs when the port opens before NestJS finishes initializing.
+          curl --retry 15 --retry-delay 2 --retry-connrefused --retry-all-errors --fail http://localhost:4000/health || \
             (docker logs api-smoke && exit 1)
           docker stop api-smoke
