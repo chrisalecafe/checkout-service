@@ -24,7 +24,7 @@ Out of scope: payment processing, inventory, shipping, order management.
 
 **FR-AUTH-02** — `POST /checkout` requires `Authorization: Bearer <token>`. Invalid/missing → 401.
 
-**FR-AUTH-03** — Auth provider selectable via `AUTH_PROVIDER` env var (`jwt` | `auth0` | `cognito` | `firebase`). No code changes required to switch.
+**FR-AUTH-03** — Auth provider selectable via `AUTH_PROVIDER` env var (`supabase` | `jwt` | `mock`). No code changes required to switch.
 
 ### Checkout
 
@@ -50,7 +50,7 @@ total    = round(subtotal + taxes − discount, 2)
 
 **FR-PERSIST-03** — `created_at` timestamp set at insertion.
 
-**FR-PERSIST-04** — DB provider selectable via `DB_PROVIDER` env var (`postgres` | `dynamo` | `mongo`).
+**FR-PERSIST-04** — DB provider selectable via `DB_PROVIDER` env var (`postgres` | `mock`).
 
 ### Health
 
@@ -118,22 +118,34 @@ src/
 
 ## 5. Data
 
-```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email TEXT NOT NULL UNIQUE,
-  password TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+### Declarative Schema (`prisma/schema.prisma`)
 
+```prisma
+model CheckoutSession {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String
+  items      Json
+  subtotal   Decimal  @db.Decimal(12, 2)
+  taxes      Decimal  @db.Decimal(12, 2)
+  discount   Decimal  @db.Decimal(12, 2)
+  total      Decimal  @db.Decimal(12, 2)
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  @@map("checkout_sessions")
+}
+```
+
+### Raw SQL Database Schema
+
+```sql
 CREATE TABLE checkout_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id),
-  items JSONB NOT NULL,
-  subtotal NUMERIC(12,2) NOT NULL,
-  taxes NUMERIC(12,2) NOT NULL,
-  discount NUMERIC(12,2) NOT NULL,
-  total NUMERIC(12,2) NOT NULL,
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    VARCHAR(255) NOT NULL, -- Managed by external Auth providers
+  items      JSONB NOT NULL,        -- [{ name, unit_price, quantity }]
+  subtotal   NUMERIC(12,2) NOT NULL,
+  taxes      NUMERIC(12,2) NOT NULL,
+  discount   NUMERIC(12,2) NOT NULL,
+  total      NUMERIC(12,2) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 ```

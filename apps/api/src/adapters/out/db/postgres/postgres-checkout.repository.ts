@@ -18,15 +18,27 @@ export class PostgresCheckoutRepository implements ICheckoutRepository {
         total: session.total,
       },
     });
+    return this.toEntity(saved);
+  }
+
+  async findByUser(userId: string): Promise<CheckoutSession[]> {
+    const rows = await this.prisma.checkoutSession.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: 'desc' },
+    });
+    return rows.map((r) => this.toEntity(r));
+  }
+
+  private toEntity(row: any): CheckoutSession {
     return {
-      id: saved.id,
-      user_id: saved.user_id,
-      items: saved.items as CheckoutSession['items'],
-      subtotal: Number(saved.subtotal),
-      taxes: Number(saved.taxes),
-      discount: Number(saved.discount),
-      total: Number(saved.total),
-      created_at: saved.created_at,
+      id: row.id,
+      user_id: row.user_id,
+      items: row.items as CheckoutSession['items'],
+      subtotal: Number(row.subtotal),
+      taxes: Number(row.taxes),
+      discount: Number(row.discount),
+      total: Number(row.total),
+      created_at: row.created_at,
     };
   }
 }

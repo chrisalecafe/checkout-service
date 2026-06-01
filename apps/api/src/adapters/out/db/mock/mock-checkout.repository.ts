@@ -22,7 +22,12 @@ export class MockCheckoutRepository implements ICheckoutRepository {
     return mockSession;
   }
 
-  // Helper method for testing or viewing stored sessions
+  async findByUser(userId: string): Promise<CheckoutSession[]> {
+    return this.sessions
+      .filter((s) => s.user_id === userId)
+      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+  }
+
   getSessions(): CheckoutSession[] {
     return this.sessions;
   }

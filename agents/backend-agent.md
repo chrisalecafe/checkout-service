@@ -132,6 +132,33 @@ Rules:
 - Tests must be deterministic — no random data, no time-dependent logic without mocking.
 - Mock all ports (`ICheckoutRepository`, `IAuthProvider`) in unit tests; use real DB only in integration tests.
 
+## Swagger / OpenAPI — keep docs in sync
+
+Every change to the API surface must update Swagger in the same commit. This is not optional.
+
+**When adding or modifying an endpoint:**
+1. Add or update `@ApiOperation` (summary + description) on the handler method.
+2. Add `@ApiResponse` for every possible status code the endpoint can return (200/201, 400, 401, 409, 503, etc.).
+3. Add `@ApiBearerAuth()` to any handler protected by `JwtAuthGuard`.
+4. Add `@ApiTags('tag-name')` to the controller class if the tag doesn't exist yet.
+
+**When adding or modifying a DTO:**
+- Add `@ApiProperty` to every field, including nested objects and arrays.
+- Set `example`, `description`, `minimum`, `maxLength`, or other constraints that mirror the class-validator decorators.
+- For response shapes that don't already have a dedicated DTO class, create one (e.g., `CheckoutResponseDto`) so Swagger can reference a named schema rather than `any`.
+
+**Order of operations for a new endpoint:**
+1. Write the failing test (TDD Red).
+2. Write the DTO with `@ApiProperty` decorators.
+3. Write the controller method with all `@Api*` decorators.
+4. Implement the use case / domain logic (TDD Green).
+5. Verify `GET /api/docs` reflects the new endpoint before marking the task done.
+
+**Never:**
+- Add a new route without `@ApiOperation` and at least one `@ApiResponse`.
+- Add a new DTO field without a matching `@ApiProperty`.
+- Leave a response type as `any` in a controller — always reference a typed DTO class.
+
 ## Never
 
 - Import infrastructure into `core/domain` or `core/application`.
@@ -139,3 +166,4 @@ Rules:
 - Return stack traces or internal error details to clients.
 - Hardcode secrets — all via env vars.
 - Write implementation code before the corresponding test exists.
+- Ship an endpoint without updating Swagger in the same change.

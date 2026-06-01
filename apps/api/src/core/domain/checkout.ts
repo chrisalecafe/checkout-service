@@ -4,6 +4,18 @@ export interface CheckoutItem {
   quantity: number;
 }
 
+export interface PricingConfig {
+  taxRate: number;           // e.g. 0.13 for 13%
+  discountThreshold: number; // e.g. 100 — subtotal must exceed this
+  discountRate: number;      // e.g. 0.10 for 10%
+}
+
+export const DEFAULT_PRICING_CONFIG: PricingConfig = {
+  taxRate: 0.13,
+  discountThreshold: 100,
+  discountRate: 0.10,
+};
+
 export interface CheckoutSession {
   id: string;
   user_id: string;

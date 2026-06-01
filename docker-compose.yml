@@ -15,6 +15,16 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.migrate
+    environment:
+      DATABASE_URL: postgres://dev:dev@postgres:5432/checkout
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: .
@@ -24,14 +34,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgres://dev:dev@postgres:5432/checkout
-      JWT_SECRET: local-dev-secret-change-in-production
-      AUTH_PROVIDER: jwt
+      JWT_SECRET: local-dev-secret-32-chars-minimum!
+      # AUTH_PROVIDER options: supabase (default), mock (no credentials needed for local dev)
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-mock}
       DB_PROVIDER: postgres
       DB_SSL: "false"
       SHELL_ORIGIN: http://localhost:3000
       PORT: "4000"
+      # Required when AUTH_PROVIDER=supabase — set in .env or export before running
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   web:
     build:
@@ -40,7 +62,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:4000
 

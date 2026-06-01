@@ -1,0 +1,67 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # ── Deploy — push images, migrate, deploy to Cloud Run ──────────────────────
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # required for Workload Identity Federation
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+
+      - name: Build and push API image
+        run: |
+          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/api:${{ github.sha }}"
+          docker build -f apps/api/Dockerfile -t $IMAGE .
+          docker push $IMAGE
+
+      - name: Build and push Web image
+        run: |
+          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/web:${{ github.sha }}"
+          docker build -f apps/web/Dockerfile -t $IMAGE .
+          docker push $IMAGE
+
+      - name: Run database migrations
+        run: |
+          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/api:${{ github.sha }}"
+          gcloud run jobs create checkout-migrate-${{ github.run_number }} \
+            --image $IMAGE \
+            --region ${{ secrets.GCP_REGION }} \
+            --set-secrets DATABASE_URL=checkout-database-url:latest \
+            --command "pnpm" \
+            --args "--filter,@checkout/api,exec,prisma,migrate,deploy" \
+            --execute-now \
+            --wait \
+            --delete-on-job-completion || true
+
+      - name: Deploy API to Cloud Run
+        run: |
+          gcloud run deploy checkout-api \
+            --image "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/api:${{ github.sha }}" \
+            --region ${{ secrets.GCP_REGION }} \
+            --platform managed
+
+      - name: Deploy Web to Cloud Run
+        run: |
+          gcloud run deploy checkout-web \
+            --image "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/web:${{ github.sha }}" \
+            --region ${{ secrets.GCP_REGION }} \
+            --platform managed

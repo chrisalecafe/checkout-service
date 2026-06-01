@@ -4,7 +4,7 @@
   "scripts": {
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "build": "prisma generate && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "dev": "prisma generate && ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/main.ts",
     "start": "node dist/main.js",
     "test": "jest --passWithNoTests",
@@ -16,20 +16,25 @@
     "@nestjs/core": "^10.0.0",
     "@nestjs/jwt": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/swagger": "^7.0.0",
+    "@nestjs/throttler": "^6.5.0",
     "@prisma/client": "^5.0.0",
+    "@supabase/supabase-js": "^2.106.2",
     "bcrypt": "^5.1.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
+    "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.11.0",
+    "prisma": "^5.0.0",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.0",
-    "prisma": "^5.0.0"
+    "rxjs": "^7.8.0"
   },
   "devDependencies": {
     "@nestjs/testing": "^10.0.0",
     "@types/bcrypt": "^5.0.0",
     "@types/express": "^4.17.0",
+    "@types/helmet": "^4.0.0",
     "@types/jest": "^29.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.0.0",
@@ -38,6 +43,7 @@
     "supertest": "^6.0.0",
     "ts-jest": "^29.0.0",
     "ts-node-dev": "^2.0.0",
+    "tsc-alias": "^1.8.17",
     "tsconfig-paths": "^4.0.0",
     "typescript": "^5.0.0"
   },
@@ -53,6 +59,12 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@domain/(.*)$": "<rootDir>/core/domain/$1",
+      "^@ports/(.*)$": "<rootDir>/core/ports/$1",
+      "^@application/(.*)$": "<rootDir>/core/application/$1",
+      "^@adapters/(.*)$": "<rootDir>/adapters/$1"
+    }
   }
 }

@@ -1,4 +1,5 @@
 import { calculateCheckout, calculateSubtotal, calculateTaxes, calculateDiscount, calculateTotal } from '../pricing.engine';
+import { PricingConfig } from '../checkout';
 
 describe('pricing engine', () => {
   describe('calculateSubtotal', () => {
@@ -39,6 +40,25 @@ describe('pricing engine', () => {
     it('sums subtotal + taxes - discount', () => {
       expect(calculateTotal(50, 6.50, 0)).toBe(56.50);
       expect(calculateTotal(109.97, 14.30, 11.00)).toBe(113.27);
+    });
+  });
+
+  describe('calculateCheckout with custom config', () => {
+    const config: PricingConfig = { taxRate: 0.20, discountThreshold: 50, discountRate: 0.05 };
+
+    it('applies custom tax rate', () => {
+      const r = calculateCheckout([{ name: 'A', unit_price: 100, quantity: 1 }], config);
+      expect(r.taxes).toBe(20);
+    });
+
+    it('applies custom discount threshold and rate', () => {
+      const r = calculateCheckout([{ name: 'A', unit_price: 60, quantity: 1 }], config);
+      expect(r.discount).toBe(3); // 60 > 50 → 60 * 0.05
+    });
+
+    it('no discount when subtotal is at or below custom threshold', () => {
+      const r = calculateCheckout([{ name: 'A', unit_price: 50, quantity: 1 }], config);
+      expect(r.discount).toBe(0);
     });
   });
 

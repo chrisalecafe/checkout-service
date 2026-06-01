@@ -22,34 +22,127 @@ The checkout service is a stateless NestJS microservice that calculates checkout
 
 The business core has zero dependencies on any framework or infrastructure library. All I/O crosses a port interface. Adapters implement ports and are swapped via env vars — no code changes required to change the database or auth provider.
 
-Dependency rule: arrows always point inward.
+Dependency rule: arrows always point inward toward the business core.
 
+```mermaid
+graph RL
+    Domain["Domain Core<br/>(Business Rules / Entities)"]
+    Application["Application Layer<br/>(Use Cases / Ports)"]
+    Adapters["Adapters Layer<br/>(Prisma / Controllers)"]
+    Infra["Framework & Infrastructure<br/>(NestJS / Express / Node.js)"]
+
+    Infra --> Adapters
+    Adapters --> Application
+    Application --> Domain
+
+    classDef core fill:#fdf2f8,stroke:#ec4899,stroke-width:2px,color:#9d174d;
+    classDef app fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#065f46;
+    classDef adapt fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e40af;
+    classDef infra fill:#f9fafb,stroke:#9ca3af,stroke-width:2px,color:#374151;
+
+    class Domain core;
+    class Application app;
+    class Adapters adapt;
+    class Infra infra;
 ```
-domain ← application ← adapters ← framework / infra
-```
+
+The core (`Domain` & `Application`) is contained at the center and has zero coupling to infrastructure (Database, Web Framework, Auth Providers). Communication with the external world is exclusively done through defined contracts (**Ports**). Any external system implements these contracts through pluggable modules (**Adapters**).
 
 ---
 
 ## 3. System Context
 
+```mermaid
+graph TD
+    %% Custom Styles
+    classDef client fill:#f5f3ff,stroke:#8b5cf6,stroke-width:2px,color:#4c1d95;
+    classDef api fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e3a8a;
+    classDef db fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+    classDef ext fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#7c2d12;
+    classDef port fill:#ffffff,stroke:#6b7280,stroke-width:1px,stroke-dasharray: 4;
+
+    subgraph UserFacing ["User Interface & Consumers"]
+        NextJS["Next.js Web App<br/>(Client UI on :3000)"]:::client
+        ExternalClient["External API Consumer<br/>(Mobile / Other Clients)"]:::client
+    end
+
+    subgraph Service ["Checkout Microservice (NestJS on :4000)"]
+        CheckoutAPI["API Entry Controllers<br/>(Auth, Checkout, Health)"]:::api
+        
+        subgraph Core ["Ports & Core Domain"]
+            IProcess["IProcessCheckout (In Port)"]:::port
+            ICheckoutRepo["ICheckoutRepository (Out Port)"]:::port
+            IAuth["IAuthProvider (Out Port)"]:::port
+        end
+    end
+
+    subgraph Storage ["Session Storage Adapters"]
+        Postgres["Postgres DB Adapter<br/>(Prisma - Active MVP)"]:::db
+        Dynamo["DynamoDB Adapter<br/>(Swappable)"]:::db
+        Mongo["MongoDB Adapter<br/>(Swappable)"]:::db
+    end
+
+    subgraph Identity ["Identity Providers (Swappable Adapters)"]
+        JWT["Local JWT Provider<br/>(Bcrypt cost 12 / Active)"]:::ext
+        Auth0["Auth0 Provider"]:::ext
+        Cognito["AWS Cognito Provider"]:::ext
+        Firebase["Firebase Auth Provider"]:::ext
+    end
+
+    %% Flow Arrows
+    NextJS -->|HTTPS + JWT| CheckoutAPI
+    ExternalClient -->|HTTPS + JWT| CheckoutAPI
+    
+    CheckoutAPI --> IProcess
+    IProcess --> ICheckoutRepo
+    IProcess --> IAuth
+    
+    ICheckoutRepo --> Postgres
+    ICheckoutRepo -.-> Dynamo
+    ICheckoutRepo -.-> Mongo
+    
+    IAuth --> JWT
+    IAuth -.-> Auth0
+    IAuth -.-> Cognito
+    IAuth -.-> Firebase
+
+    linkStyle 0,1 stroke:#8b5cf6,stroke-width:2px;
+    linkStyle 2,3,4 stroke:#2563eb,stroke-width:2px;
+    linkStyle 5 stroke:#10b981,stroke-width:2px;
+    linkStyle 6,7 stroke:#9ca3af,stroke-width:1.5px,stroke-dasharray: 4;
+    linkStyle 8 stroke:#f97316,stroke-width:2px;
+    linkStyle 9,10,11 stroke:#9ca3af,stroke-width:1.5px,stroke-dasharray: 4;
 ```
-┌──────────────────────────────────────────┐
-│           Client                         │
-│  (Next.js web app / API consumer)        │
-└───────────────┬──────────────────────────┘
-                │ HTTPS + JWT
-┌───────────────▼──────────────────────────┐
-│           Checkout Service (NestJS)      │
-│  POST /checkout  POST /auth/login        │
-│  GET  /health                            │
-└──────────┬───────────────┬───────────────┘
-           │               │
-  ┌────────▼──────┐  ┌─────▼──────────────┐
-  │  PostgreSQL   │  │  Auth Provider      │
-  │  (sessions)   │  │  JWT / Auth0 /      │
-  └───────────────┘  │  Cognito / Firebase  │
-                     └─────────────────────┘
+
+### 3.1 End-to-End Connection Mechanics
+
+The Frontend and External Adapters connect through a structured multi-layer pipeline:
+
+```mermaid
+graph TD
+    Next["Frontend (Next.js)<br/>Port :3000"]:::client
+    API["Checkout Service (NestJS)<br/>Port :4000"]:::service
+    Inbound["1. Inbound Adapters<br/>(Controllers / Guards)"]:::service
+    Application["2. Application Core<br/>(Use Cases / Ports)"]:::core
+    Outbound["3. Outbound Adapters<br/>(Prisma / Bcrypt)"]:::service
+    External["External Infra<br/>(PostgreSQL / OIDC)"]:::ext
+
+    Next -->|HTTPS Requests + JWT| Inbound
+    Inbound --> API
+    API -->|DTOs via Ports| Application
+    Application -->|Outbound Port calls| Outbound
+    Outbound -->|SQL / API| External
+
+    classDef client fill:#f5f3ff,stroke:#8b5cf6,stroke-width:2px,color:#4c1d95;
+    classDef service fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e3a8a;
+    classDef core fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+    classDef ext fill:#fff7ed,stroke:#f97316,stroke-width:2px,color:#7c2d12;
 ```
+
+1. **Frontend to Inbound HTTP Adapters**: Next.js client sends HTTPS requests to the controllers. Protected routes contain a `Bearer <token>` HTTP header.
+2. **Inbound Adapters to Core Ports**: Controllers & Guards validate authentication (calling `validateToken` on the Auth Port) and then pass DTOs into the Application Core through inbound Port interfaces (`IProcessCheckout`).
+3. **Core to Outbound Adapters**: The use case processes the business logic and calls outbound Ports (`ICheckoutRepository` / `IAuthProvider`) to save data or verify credentials.
+4. **Outbound Adapters to External Infrastructure**: Active DB adapters query the database (e.g., Prisma querying PostgreSQL), and Auth adapters connect to local database tables or external OIDC providers.
 
 ---
 
@@ -167,43 +260,83 @@ Next.js App Router single application. Two routes:
 
 ### POST /checkout
 
-```
-Client
-  │  POST /checkout  Authorization: Bearer <token>
-  ▼
-JwtAuthGuard
-  │  IAuthProvider.validateToken(token) → { userId }
-  ▼
-CheckoutController
-  │  IProcessCheckout.execute(userId, items)
-  ▼
-ProcessCheckoutUseCase
-  │  pricing.engine.calculateSubtotal / Taxes / Discount / Total
-  │  ICheckoutRepository.save({ userId, items, subtotal, taxes, discount, total })
-  ▼
-PostgresCheckoutRepository  →  INSERT INTO checkout_sessions
-  │
-  ◄ CheckoutSession
-  ▼
-CheckoutController  →  201 { subtotal, taxes, discount, total }
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Next.js Client
+    participant Guard as JwtAuthGuard
+    participant Auth as IAuthProvider (JWT/Auth0)
+    participant Ctrl as CheckoutController
+    participant UC as ProcessCheckoutUseCase
+    participant Engine as PricingEngine (Pure)
+    participant Repo as ICheckoutRepository
+    participant DB as PostgreSQL Database
+
+    Client->>Guard: POST /checkout (Bearer <token>, items)
+    activate Guard
+    Guard->>Auth: validateToken(token)
+    activate Auth
+    Auth-->>Guard: Return user session { userId }
+    deactivate Auth
+    
+    Guard->>Ctrl: Forward Request (with authenticated user)
+    deactivate Guard
+    activate Ctrl
+    
+    Ctrl->>UC: execute(userId, items)
+    activate UC
+    
+    UC->>Engine: calculateSubtotal / Taxes / Discount / Total (items)
+    activate Engine
+    Engine-->>UC: Return computed pricing figures
+    deactivate Engine
+    
+    UC->>Repo: save(sessionDetails)
+    activate Repo
+    Repo->>DB: INSERT INTO checkout_sessions (via Prisma)
+    activate DB
+    DB-->>Repo: Insert Success
+    deactivate DB
+    Repo-->>UC: Return CheckoutSession object
+    deactivate Repo
+    
+    UC-->>Ctrl: Return CheckoutResult
+    deactivate UC
+    
+    Ctrl-->>Client: 201 Created (subtotal, taxes, discount, total)
+    deactivate Ctrl
 ```
 
 ---
 
 ## 7. Data Model
 
-```sql
-CREATE TABLE users (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email      TEXT NOT NULL UNIQUE,
-  password   TEXT NOT NULL,        -- bcrypt hash, cost 12
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+The database schema is declaratively defined via the Prisma Schema (`prisma/schema.prisma`). It consists of a single immutable table, as authentication and user records are delegated to pluggable identity systems (like Supabase Auth or mock providers).
 
+### 7.1 Prisma Schema (`prisma/schema.prisma`)
+
+```prisma
+model CheckoutSession {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String
+  items      Json
+  subtotal   Decimal  @db.Decimal(12, 2)
+  taxes      Decimal  @db.Decimal(12, 2)
+  discount   Decimal  @db.Decimal(12, 2)
+  total      Decimal  @db.Decimal(12, 2)
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  @@map("checkout_sessions")
+}
+```
+
+### 7.2 SQL Database Schema
+
+```sql
 CREATE TABLE checkout_sessions (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID NOT NULL REFERENCES users(id),
-  items      JSONB NOT NULL,       -- [{ name, unit_price, quantity }]
+  user_id    VARCHAR(255) NOT NULL, -- Managed by external Auth providers
+  items      JSONB NOT NULL,        -- [{ name, unit_price, quantity }]
   subtotal   NUMERIC(12,2) NOT NULL,
   taxes      NUMERIC(12,2) NOT NULL,
   discount   NUMERIC(12,2) NOT NULL,
@@ -218,28 +351,65 @@ CREATE TABLE checkout_sessions (
 
 ## 8. Deployment View
 
-```
-┌─────────────────────────────────────────────────┐
-│  Railway / AWS ECS / GCP Cloud Run              │
-│                                                 │
-│  ┌─────────────┐     ┌─────────────────────┐   │
-│  │  api        │────▶│  PostgreSQL          │   │
-│  │  :4000      │     │  (Supabase / RDS /   │   │
-│  └─────────────┘     │   Cloud SQL)         │   │
-│         ▲            └─────────────────────┘   │
-│         │                                       │
-└─────────┼───────────────────────────────────────┘
-          │ HTTPS
-┌─────────┴───────────────────────────────────────┐
-│  Vercel                                         │
-│  ┌─────────────┐                               │
-│  │  web        │  Next.js App Router            │
-│  │  :3000      │                               │
-│  └─────────────┘                               │
-└─────────────────────────────────────────────────┘
+### 8.1 General MVP & Multi-Cloud Deployment
+
+The general multi-cloud target hosts the frontend on Vercel and the backend container on a microservice host:
+
+```mermaid
+graph TD
+    classDef client fill:#fcfcfc,stroke:#000000,stroke-width:2px,color:#000000;
+    classDef api fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e3a8a;
+    classDef db fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+
+    subgraph ClientHost ["Vercel Edge Cloud / Frontend"]
+        NextJS["Next.js Web App<br/>(Client UI)<br/>Port :3000"]:::client
+    end
+
+    subgraph ServiceHost ["Railway / AWS ECS / GCP Cloud Run"]
+        NestAPI["NestJS Checkout API<br/>(Stateless Docker Container)<br/>Port :4000"]:::api
+    end
+
+    subgraph DbHost ["Managed Database Layer"]
+        Postgres["PostgreSQL Database<br/>(Supabase / RDS / Cloud SQL)"]:::db
+    end
+
+    NextJS -->|HTTPS API Requests / JWT| NestAPI
+    NestAPI -->|Prisma Engine connection| Postgres
+
+    linkStyle 0 stroke:#2563eb,stroke-width:2px;
+    linkStyle 1 stroke:#10b981,stroke-width:2px;
 ```
 
-All configuration injected via environment variables. Switching from Railway to AWS or GCP requires no code changes.
+### 8.2 GCP Production Deployment (Terraform)
+
+When deploying to Google Cloud Platform, the configuration uses containerized services on **Google Cloud Run** for both layers, combined with **Supabase** for fully managed PostgreSQL data and Authentication:
+
+```mermaid
+graph TD
+    classDef client fill:#fcfcfc,stroke:#000000,stroke-width:2px,color:#000000;
+    classDef api fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e3a8a;
+    classDef db fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+
+    subgraph ClientHost ["Google Cloud Run (web)"]
+        NextJS["Next.js Web App<br/>(Frontend UI)<br/>Port :3000"]:::client
+    end
+
+    subgraph ServiceHost ["Google Cloud Run (api)"]
+        NestAPI["NestJS Checkout API<br/>(Backend Service)<br/>Port :4000"]:::api
+    end
+
+    subgraph DbHost ["Supabase Platform"]
+        Postgres["PostgreSQL Database<br/>(Managed Sessions / Users)"]:::db
+    end
+
+    NextJS -->|HTTPS API Requests / JWT| NestAPI
+    NestAPI -->|Prisma connection| Postgres
+
+    linkStyle 0 stroke:#2563eb,stroke-width:2px;
+    linkStyle 1 stroke:#10b981,stroke-width:2px;
+```
+
+All secrets are securely fetched from **Google Secret Manager** at startup. Switch targets by changing environment variables only — zero code changes required.
 
 ---
 

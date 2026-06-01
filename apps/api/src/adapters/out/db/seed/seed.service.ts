@@ -1,9 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
-// password: password123
-const HASHED_PW = '$2b$10$j4RF8wliG28Fm7rnbU9ag.B1l3MpZ7uazhwAlbemALrViqHFzc7IO';
-
 @Injectable()
 export class SeedService implements OnApplicationBootstrap {
   private readonly logger = new Logger(SeedService.name);
@@ -13,17 +10,8 @@ export class SeedService implements OnApplicationBootstrap {
   async onApplicationBootstrap(): Promise<void> {
     if (process.env.NODE_ENV === 'production') return;
 
-    await this.prisma.user.upsert({
-      where: { id: '00000000-0000-0000-0000-000000000001' },
-      update: {},
-      create: { id: '00000000-0000-0000-0000-000000000001', email: 'dev@example.com', password: HASHED_PW },
-    });
-    await this.prisma.user.upsert({
-      where: { id: '00000000-0000-0000-0000-000000000002' },
-      update: {},
-      create: { id: '00000000-0000-0000-0000-000000000002', email: 'alice@example.com', password: HASHED_PW },
-    });
-
+    // User IDs come from the external auth provider (Supabase/JWT adapter).
+    // These are stable dev UUIDs that match MockAuthAdapter's seeded users.
     await this.prisma.checkoutSession.upsert({
       where: { id: '10000000-0000-0000-0000-000000000001' },
       update: {},
@@ -55,6 +43,6 @@ export class SeedService implements OnApplicationBootstrap {
       },
     });
 
-    this.logger.log('Dev seed data loaded (dev@example.com / alice@example.com, password: password123)');
+    this.logger.log('Dev seed data loaded.');
   }
 }

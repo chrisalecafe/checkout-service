@@ -1,31 +1,47 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { IAuthProvider } from '@ports/out/auth.provider.port';
-import { PrismaService } from '@adapters/out/db/prisma/prisma.service';
 
 const BCRYPT_COST = 12;
 
 @Injectable()
 export class JwtAuthAdapter implements IAuthProvider {
-  private readonly secret = process.env.JWT_SECRET ?? 'change-me';
+  private readonly secret: string;
+  private readonly logger = new Logger(JwtAuthAdapter.name);
+  private readonly users = new Map<string, { id: string; email: string; passwordHash: string }>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor() {
+    const secret = process.env.JWT_SECRET;
+    if (!secret || secret.length < 32) {
+      throw new Error('JWT_SECRET env var must be set and at least 32 characters long.');
+    }
+    this.secret = secret;
+  }
 
   async register(email: string, password: string): Promise<{ userId: string }> {
-    const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) throw new ConflictException('Email already registered');
-    const hash = await bcrypt.hash(password, BCRYPT_COST);
-    const saved = await this.prisma.user.create({ data: { email, password: hash } });
-    return { userId: saved.id };
+    for (const u of this.users.values()) {
+      if (u.email === email) throw new ConflictException('Email already registered');
+    }
+    const userId = randomUUID();
+    const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
+    this.users.set(userId, { id: userId, email, passwordHash });
+    this.logger.log(`User registered: ${userId}`);
+    return { userId };
   }
 
   async verifyCredentials(email: string, password: string): Promise<{ userId: string }> {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
-    return { userId: user.id };
+    let found: { id: string; email: string; passwordHash: string } | undefined;
+    for (const u of this.users.values()) {
+      if (u.email === email) { found = u; break; }
+    }
+    if (!found || !(await bcrypt.compare(password, found.passwordHash))) {
+      this.logger.warn('Failed login attempt');
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    this.logger.log(`Successful login for user: ${found.id}`);
+    return { userId: found.id };
   }
 
   async issueToken(userId: string): Promise<{ access_token: string; expires_in: number }> {

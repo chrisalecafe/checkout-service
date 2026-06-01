@@ -1,6 +1,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+RUN apk add --no-cache openssl
 RUN npm i -g pnpm
 
 # Copy workspace manifests first for layer caching
@@ -12,17 +13,30 @@ RUN pnpm install --frozen-lockfile --filter @checkout/api
 COPY apps/api ./apps/api
 
 RUN pnpm --filter @checkout/api build
-RUN pnpm --filter @checkout/api --prod deploy /app/deploy
 
+# ── Runner ────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+RUN apk add --no-cache openssl
+RUN npm i -g pnpm
+
+# Install production deps — packages land in /app/apps/api/node_modules
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/api/prisma ./apps/api/prisma
+
+RUN pnpm install --frozen-lockfile --filter @checkout/api --prod
+
+# Generate Prisma client inside the package's own node_modules
+RUN pnpm --filter @checkout/api exec prisma generate
+
+# Copy compiled output next to its node_modules so Node resolution works
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+
 RUN addgroup -S app && adduser -S app -G app
-
-COPY --from=builder /app/deploy/node_modules ./node_modules
-COPY --from=builder /app/apps/api/dist ./dist
-
 USER app
+
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:4000/health || exit 1
-CMD ["node", "dist/main.js"]
+CMD ["node", "apps/api/dist/main.js"]

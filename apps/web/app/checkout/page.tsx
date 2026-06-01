@@ -3,12 +3,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Button, Card, CardBody, CardHeader,
-  Input, Divider, Spinner,
+  Input, Divider,
 } from '@heroui/react';
 import { useAuth } from '../../lib/auth-context';
 import { checkout } from '../../lib/api';
 import { CheckoutItem, CheckoutResult } from '../../lib/types';
 import { checkoutFormSchema } from './schemas';
+import { Navbar } from '../components/Navbar';
 
 const emptyItem = (): CheckoutItem => ({ name: '', unit_price: 0, quantity: 1 });
 
@@ -49,19 +50,6 @@ export default function CheckoutPage() {
 
     const result = checkoutFormSchema.safeParse({ items });
     if (!result.success) {
-      const errs = result.error.flatten().fieldErrors;
-      const perItem: ItemErrors[] = items.map((_, idx) => {
-        const prefix = `items[${idx}]`;
-        const fieldErr: ItemErrors = {};
-        for (const [key, msgs] of Object.entries(errs)) {
-          if (key.startsWith(prefix)) {
-            const sub = key.replace(`${prefix}.`, '') as keyof CheckoutItem;
-            (fieldErr as Record<string, string>)[sub] = (msgs as string[])[0];
-          }
-        }
-        return fieldErr;
-      });
-      // also check per-item errors from nested flatten
       const nestedErrors = result.error.issues.reduce<ItemErrors[]>((acc, issue) => {
         const [, idxStr, field] = issue.path as [string, number, string];
         if (idxStr !== undefined && field !== undefined) {
@@ -98,21 +86,19 @@ export default function CheckoutPage() {
   if (!token) return null;
 
   return (
-    <main className="min-h-screen bg-default-100 py-10 px-4">
-      <div className="max-w-2xl mx-auto flex flex-col gap-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Checkout</h1>
-          <Button
-            variant="light"
-            size="sm"
-            color="default"
-            onPress={() => { logout(); router.push('/login'); }}
-          >
-            Sign out
-          </Button>
+    <div className="min-h-screen bg-default-100">
+      <Navbar
+        onSignOut={() => { logout(); router.push('/login'); }}
+        isDisabled={loading}
+      />
+
+      <main className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-6">
+        <div>
+          <h1 className="text-2xl font-bold">New Checkout</h1>
+          <p className="text-sm text-default-500 mt-1">Add items and calculate totals instantly.</p>
         </div>
 
-        <Card>
+        <Card shadow="sm">
           <CardBody className="gap-4 p-6">
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               {items.map((item, idx) => (
@@ -168,7 +154,7 @@ export default function CheckoutPage() {
                       size="sm"
                       variant="light"
                       color="danger"
-                      isDisabled={items.length === 1}
+                      isDisabled={loading || items.length === 1}
                       onPress={() => removeItem(idx)}
                     >
                       Remove
@@ -178,11 +164,18 @@ export default function CheckoutPage() {
               ))}
 
               <div className="flex justify-between items-center pt-1">
-                <Button type="button" variant="light" color="primary" size="sm" onPress={addItem}>
+                <Button
+                  type="button"
+                  variant="light"
+                  color="primary"
+                  size="sm"
+                  isDisabled={loading}
+                  onPress={addItem}
+                >
                   + Add item
                 </Button>
                 <span className="text-sm text-default-500">
-                  Running subtotal: <strong>${runningSubtotal.toFixed(2)}</strong>
+                  Subtotal: <strong>${runningSubtotal.toFixed(2)}</strong>
                 </span>
               </div>
 
@@ -195,16 +188,19 @@ export default function CheckoutPage() {
                 isLoading={loading}
                 isDisabled={loading}
               >
-                {loading ? <Spinner size="sm" color="white" /> : 'Calculate checkout'}
+                Calculate checkout
               </Button>
             </form>
           </CardBody>
         </Card>
 
         {result && (
-          <Card>
-            <CardHeader className="px-6 pt-5 pb-0">
-              <h2 className="font-semibold text-lg">Result</h2>
+          <Card shadow="sm">
+            <CardHeader className="px-6 pt-5 pb-0 flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-success" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <h2 className="font-semibold text-lg">Summary</h2>
             </CardHeader>
             <CardBody className="px-6 pb-6 gap-2">
               {(
@@ -222,12 +218,12 @@ export default function CheckoutPage() {
               <Divider className="my-2" />
               <div className="flex justify-between font-bold text-base">
                 <span>Total</span>
-                <span>${result.total.toFixed(2)}</span>
+                <span className="text-primary">${result.total.toFixed(2)}</span>
               </div>
             </CardBody>
           </Card>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

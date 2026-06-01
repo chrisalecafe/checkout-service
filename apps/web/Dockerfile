@@ -20,7 +20,6 @@ RUN addgroup -S app && adduser -S app -G app
 
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./.next/static
-COPY --from=builder /app/apps/web/public ./public
 
 USER app
 EXPOSE 3000

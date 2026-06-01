@@ -1,6 +1,7 @@
 import { ProcessCheckoutUseCase } from '../process-checkout.usecase';
 import { ICheckoutRepository } from '../../ports/out/checkout.repo.port';
-import { CheckoutItem, CheckoutSession } from '../../domain/checkout';
+import { IPricingConfigProvider } from '../../ports/out/pricing-config.provider.port';
+import { CheckoutItem, CheckoutSession, DEFAULT_PRICING_CONFIG } from '../../domain/checkout';
 
 const makeSession = (overrides: Partial<CheckoutSession> = {}): CheckoutSession => ({
   id: 'uuid-1',
@@ -14,13 +15,17 @@ const makeSession = (overrides: Partial<CheckoutSession> = {}): CheckoutSession 
   ...overrides,
 });
 
+const makeConfigProvider = (overrides = {}): IPricingConfigProvider => ({
+  getConfig: jest.fn().mockResolvedValue({ ...DEFAULT_PRICING_CONFIG, ...overrides }),
+});
+
 describe('ProcessCheckoutUseCase', () => {
   let repo: jest.Mocked<ICheckoutRepository>;
   let useCase: ProcessCheckoutUseCase;
 
   beforeEach(() => {
-    repo = { save: jest.fn() };
-    useCase = new ProcessCheckoutUseCase(repo);
+    repo = { save: jest.fn(), findByUser: jest.fn() };
+    useCase = new ProcessCheckoutUseCase(repo, makeConfigProvider());
   });
 
   it('returns correct pricing for a single item below the discount threshold', async () => {
@@ -84,5 +89,19 @@ describe('ProcessCheckoutUseCase', () => {
     const items: CheckoutItem[] = [{ name: 'A', unit_price: 50, quantity: 1 }];
 
     await expect(useCase.execute('user-1', items)).rejects.toThrow('DB failure');
+  });
+
+  it('applies custom pricing config', async () => {
+    repo.save.mockResolvedValue(makeSession());
+    useCase = new ProcessCheckoutUseCase(
+      repo,
+      makeConfigProvider({ taxRate: 0.20, discountThreshold: 50, discountRate: 0.05 }),
+    );
+    const items: CheckoutItem[] = [{ name: 'A', unit_price: 60, quantity: 1 }];
+
+    const result = await useCase.execute('user-1', items);
+
+    // subtotal=60, taxes=60*0.20=12, discount=60*0.05=3, total=69
+    expect(result).toEqual({ subtotal: 60, taxes: 12, discount: 3, total: 69 });
   });
 });
