@@ -2,6 +2,7 @@
   "name": "@checkout/api",
   "version": "1.0.0",
   "scripts": {
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "build": "prisma generate && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
@@ -61,6 +62,7 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
     "moduleNameMapper": {
+      "^@prisma/client$": "<rootDir>/../test/__mocks__/prisma-client.ts",
       "^@domain/(.*)$": "<rootDir>/core/domain/$1",
       "^@ports/(.*)$": "<rootDir>/core/ports/$1",
       "^@application/(.*)$": "<rootDir>/core/application/$1",

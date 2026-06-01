@@ -9,7 +9,7 @@ env:
   PNPM_VERSION: "10.13.1"
 
 jobs:
-  # ── 1. Install ──────────────────────────────────────────────────────────────
+  # ── 1. Install + generate ────────────────────────────────────────────────────
   install:
     runs-on: ubuntu-latest
     steps:
@@ -24,14 +24,18 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
+      # postinstall in apps/api/package.json runs `prisma generate` automatically.
+      # The generated client lands inside node_modules and is captured by the cache below.
       - run: pnpm install --frozen-lockfile
 
       - uses: actions/cache/save@v4
         with:
-          path: node_modules
+          path: |
+            node_modules
+            apps/api/node_modules
           key: node-modules-${{ hashFiles('pnpm-lock.yaml') }}
 
-  # ── 2. Lint ─────────────────────────────────────────────────────────────────
+  # ── 2. Lint ──────────────────────────────────────────────────────────────────
   lint:
     needs: install
     runs-on: ubuntu-latest
@@ -49,11 +53,16 @@ jobs:
 
       - uses: actions/cache/restore@v4
         with:
-          path: node_modules
+          path: |
+            node_modules
+            apps/api/node_modules
           key: node-modules-${{ hashFiles('pnpm-lock.yaml') }}
 
+      # Re-run install as a fallback if cache missed; postinstall re-generates the client.
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @checkout/api exec tsc -p tsconfig.build.json --noEmit
+
+      - name: Type-check API
+        run: pnpm --filter @checkout/api exec tsc -p tsconfig.build.json --noEmit
 
   # ── 3. Test — must pass before build ────────────────────────────────────────
   test:
@@ -73,9 +82,12 @@ jobs:
 
       - uses: actions/cache/restore@v4
         with:
-          path: node_modules
+          path: |
+            node_modules
+            apps/api/node_modules
           key: node-modules-${{ hashFiles('pnpm-lock.yaml') }}
 
+      # Re-run install as a fallback if cache missed; postinstall re-generates the client.
       - run: pnpm install --frozen-lockfile
 
       - name: Run API tests
@@ -105,6 +117,7 @@ jobs:
         run: pnpm --filter @checkout/api build
         env:
           DATABASE_URL: postgresql://noop:noop@localhost:5432/noop
+          DIRECT_URL: postgresql://noop:noop@localhost:5432/noop
 
       - name: Build Web
         run: pnpm --filter @checkout/web build
@@ -147,66 +160,3 @@ jobs:
           sleep 10
           curl --retry 5 --retry-delay 2 --fail http://localhost:4000/health
           docker stop api-smoke
-
-  # ── 6. Deploy — main branch only ────────────────────────────────────────────
-  deploy:
-    needs: [build, docker]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    permissions:
-      contents: read
-      id-token: write   # required for Workload Identity Federation
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
-
-      - name: Build and push API image
-        run: |
-          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/api:${{ github.sha }}"
-          docker build -f apps/api/Dockerfile -t $IMAGE .
-          docker push $IMAGE
-
-      - name: Build and push Web image
-        run: |
-          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/web:${{ github.sha }}"
-          docker build -f apps/web/Dockerfile -t $IMAGE .
-          docker push $IMAGE
-
-      - name: Run database migrations
-        run: |
-          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/api:${{ github.sha }}"
-          gcloud run jobs create checkout-migrate-${{ github.run_number }} \
-            --image $IMAGE \
-            --region ${{ secrets.GCP_REGION }} \
-            --set-secrets DATABASE_URL=checkout-database-url:latest,DIRECT_URL=checkout-direct-url:latest \
-            --command "pnpm" \
-            --args "--filter,@checkout/api,exec,prisma,migrate,deploy" \
-            --execute-now \
-            --wait \
-            --delete-on-job-completion || true
-
-      - name: Deploy API to Cloud Run
-        run: |
-          gcloud run deploy checkout-api \
-            --image "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/api:${{ github.sha }}" \
-            --region ${{ secrets.GCP_REGION }} \
-            --platform managed
-
-      - name: Deploy Web to Cloud Run
-        run: |
-          gcloud run deploy checkout-web \
-            --image "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/web:${{ github.sha }}" \
-            --region ${{ secrets.GCP_REGION }} \
-            --platform managed
