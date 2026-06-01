@@ -19,11 +19,18 @@ async function bootstrap() {
   app.use(helmet());
 
   // CORS — never fall back to wildcard; require explicit origin in production.
-  const allowedOrigin = process.env.SHELL_ORIGIN;
+  let allowedOrigin = process.env.SHELL_ORIGIN;
   if (!allowedOrigin && process.env.NODE_ENV === 'production') {
     throw new Error('SHELL_ORIGIN env var is required in production');
   }
-  app.enableCors({ origin: allowedOrigin ?? 'http://localhost:3000' });
+  if (allowedOrigin && allowedOrigin.endsWith('/')) {
+    allowedOrigin = allowedOrigin.slice(0, -1);
+  }
+  app.enableCors({
+    origin: allowedOrigin ?? 'http://localhost:3000',
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  });
 
   // Body size limit — prevent payload-based DoS .
   // eslint-disable-next-line @typescript-eslint/no-require-imports
