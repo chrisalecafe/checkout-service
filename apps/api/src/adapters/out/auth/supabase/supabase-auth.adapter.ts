@@ -1,6 +1,12 @@
 import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { IAuthProvider } from '@ports/out/auth.provider.port';
+import ws from 'ws';
+
+// Polyfill WebSocket for Node.js < 22 to satisfy Supabase's Realtime client requirements
+if (!globalThis.WebSocket) {
+  (globalThis as any).WebSocket = ws;
+}
 
 @Injectable()
 export class SupabaseAuthAdapter implements IAuthProvider {
