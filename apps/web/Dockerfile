@@ -11,6 +11,10 @@ RUN pnpm install --frozen-lockfile --filter @checkout/web
 
 COPY apps/web ./apps/web
 
+# Baked into the Next.js bundle at build time — must be a build-arg, not a runtime env var
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN pnpm --filter @checkout/web build
 
 FROM node:20-alpine AS runner

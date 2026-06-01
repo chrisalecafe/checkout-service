@@ -292,7 +292,16 @@ flowchart LR
 | `GCP_SERVICE_ACCOUNT` | Service account email used by the pipeline |
 | `GCP_PROJECT_ID` | GCP project ID |
 | `GCP_REGION` | Region, e.g. `us-central1` |
-| `checkout-database-url` | Secret Manager secret name for the production `DATABASE_URL` |
+| `API_URL` | Production API URL — baked into the Next.js bundle at build time |
+| `WEB_URL` | Production Web URL — passed to the API as `SHELL_ORIGIN` for CORS |
+
+**Secret Manager secrets** (accessed via `--set-secrets` in the deploy steps):
+
+| Secret Manager name | Env var | Description |
+|---------------------|---------|-------------|
+| `checkout-database-url` | `DATABASE_URL` | PostgreSQL connection string |
+| `checkout-direct-url` | `DIRECT_URL` | Direct URL for Prisma migrations |
+| `checkout-jwt-secret` | `JWT_SECRET` | HS256 signing secret (min 32 chars) |
 
 ### Docker images
 

@@ -19,6 +19,7 @@ jobs:
     env:
       # Use the SHA of the commit that triggered CI, not the CD runner's HEAD
       SHA: ${{ github.event.workflow_run.head_sha }}
+      REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout
 
     steps:
       # Check out the exact commit that CI verified
@@ -38,41 +39,60 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
 
+      # ── Fix #1: build API and push SHA + latest tags ─────────────────────────
       - name: Build and push API image
         run: |
-          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/api:${{ env.SHA }}"
+          IMAGE="${{ env.REGISTRY }}/api:${{ env.SHA }}"
           docker build -f apps/api/Dockerfile -t $IMAGE .
           docker push $IMAGE
+          docker tag $IMAGE "${{ env.REGISTRY }}/api:latest"
+          docker push "${{ env.REGISTRY }}/api:latest"
 
+      # ── Fix #2: pass NEXT_PUBLIC_API_URL as build-arg (baked into bundle) ────
       - name: Build and push Web image
         run: |
-          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/web:${{ env.SHA }}"
-          docker build -f apps/web/Dockerfile -t $IMAGE .
+          IMAGE="${{ env.REGISTRY }}/web:${{ env.SHA }}"
+          docker build \
+            -f apps/web/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.API_URL }} \
+            -t $IMAGE .
           docker push $IMAGE
+          docker tag $IMAGE "${{ env.REGISTRY }}/web:latest"
+          docker push "${{ env.REGISTRY }}/web:latest"
 
+      # ── Fix #3: run migrations directly via prisma binary (no pnpm workspace) ─
+      # Migrations run BEFORE deploy — a failed migration stops the pipeline.
+      # The || true is removed: a bad migration must never silently deploy.
       - name: Run database migrations
         run: |
-          IMAGE="${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/api:${{ env.SHA }}"
+          IMAGE="${{ env.REGISTRY }}/api:${{ env.SHA }}"
           gcloud run jobs create checkout-migrate-${{ github.run_number }} \
             --image $IMAGE \
             --region ${{ secrets.GCP_REGION }} \
-            --set-secrets DATABASE_URL=checkout-database-url:latest,DIRECT_URL=checkout-direct-url:latest \
-            --command "pnpm" \
-            --args "--filter,@checkout/api,exec,prisma,migrate,deploy" \
+            --set-secrets "DATABASE_URL=checkout-database-url:latest,DIRECT_URL=checkout-direct-url:latest" \
+            --command "node" \
+            --args "node_modules/.bin/prisma,migrate,deploy,--schema,apps/api/prisma/schema.prisma" \
             --execute-now \
-            --wait \
-            --delete-on-job-completion || true
+            --wait
+          gcloud run jobs delete checkout-migrate-${{ github.run_number }} \
+            --region ${{ secrets.GCP_REGION }} \
+            --quiet
 
+      # ── Fix #4: wire secrets and env vars so the API doesn't crash on boot ───
       - name: Deploy API to Cloud Run
         run: |
           gcloud run deploy checkout-api \
-            --image "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/api:${{ env.SHA }}" \
+            --image "${{ env.REGISTRY }}/api:${{ env.SHA }}" \
             --region ${{ secrets.GCP_REGION }} \
-            --platform managed
+            --platform managed \
+            --set-secrets "DATABASE_URL=checkout-database-url:latest,JWT_SECRET=checkout-jwt-secret:latest" \
+            --set-env-vars "DB_PROVIDER=postgres,AUTH_PROVIDER=jwt,PORT=4000,DB_SSL=true,SHELL_ORIGIN=${{ secrets.WEB_URL }}"
 
+      # ── Fix #4 (web): pass API URL as runtime env for server-side use ─────────
       - name: Deploy Web to Cloud Run
         run: |
           gcloud run deploy checkout-web \
-            --image "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/checkout/web:${{ env.SHA }}" \
+            --image "${{ env.REGISTRY }}/web:${{ env.SHA }}" \
             --region ${{ secrets.GCP_REGION }} \
-            --platform managed
+            --platform managed \
+            --set-env-vars "NODE_ENV=production"
