@@ -25,7 +25,7 @@ async function bootstrap() {
   }
   app.enableCors({ origin: allowedOrigin ?? 'http://localhost:3000' });
 
-  // Body size limit — prevent payload-based DoS.
+  // Body size limit — prevent payload-based DoS .
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   app.use(require('express').json({ limit: '10kb' }));
 
