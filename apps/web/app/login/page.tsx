@@ -49,6 +49,7 @@ export default function LoginPage() {
         <CardBody className="px-6 py-8 gap-6">
           <div>
             <h1 className="text-xl font-semibold">Welcome back</h1>
+
             <p className="text-sm text-default-500 mt-1">Sign in to your account to continue</p>
           </div>
 
