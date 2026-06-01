@@ -46,7 +46,6 @@ export default function LoginPage() {
       <Logo size="lg" />
 
       <Card className="w-full max-w-sm shadow-md">
-
         <CardBody className="px-6 py-8 gap-6">
           <div>
             <h1 className="text-xl font-semibold">Welcome back</h1>

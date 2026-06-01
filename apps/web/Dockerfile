@@ -25,7 +25,10 @@ RUN addgroup -S app && adduser -S app -G app
 COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./.next/static
 
+ENV HOSTNAME="0.0.0.0"
+ENV PORT=3000
+
 USER app
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:3000/ || exit 1
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:${PORT:-3000}/ || exit 1
 CMD ["node", "server.js"]
