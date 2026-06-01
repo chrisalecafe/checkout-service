@@ -7,6 +7,7 @@ RUN npm i -g pnpm
 # Copy workspace manifests first for layer caching
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json ./apps/api/
+COPY apps/api/prisma ./apps/api/prisma
 
 RUN pnpm install --frozen-lockfile --filter @checkout/api
 
@@ -27,9 +28,7 @@ COPY apps/api/package.json ./apps/api/
 COPY apps/api/prisma ./apps/api/prisma
 
 RUN pnpm install --frozen-lockfile --filter @checkout/api --prod
-
-# Generate Prisma client inside the package's own node_modules
-RUN pnpm --filter @checkout/api exec prisma generate
+# postinstall runs `prisma generate` automatically — no extra step needed
 
 # Copy compiled output next to its node_modules so Node resolution works
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
