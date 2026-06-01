@@ -26,6 +26,7 @@ GitHub Actions CI
    artifactregistry.googleapis.com
    secretmanager.googleapis.com
    iam.googleapis.com
+   iamcredentials.googleapis.com
    ```
 
 2. **Supabase project** — free tier is sufficient for MVP.
@@ -122,6 +123,12 @@ gcloud projects add-iam-policy-binding $PROJECT \
 gcloud projects add-iam-policy-binding $PROJECT \
   --member="serviceAccount:github-deploy@$PROJECT.iam.gserviceaccount.com" \
   --role="roles/iam.serviceAccountUser"
+
+# Allow Cloud Run (via default compute service account) to access Secret Manager secrets
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT --format="value(projectNumber)")
+gcloud projects add-iam-policy-binding $PROJECT \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
 
 # Allow GitHub Actions to impersonate the SA
 POOL_ID=$(gcloud iam workload-identity-pools describe github \

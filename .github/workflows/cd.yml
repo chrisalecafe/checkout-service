@@ -70,6 +70,7 @@ jobs:
       - name: Run database migrations
         run: |
           IMAGE="${{ env.REGISTRY }}/api:${{ env.SHA }}"
+          gcloud run jobs delete checkout-migrate-${{ github.run_number }} --region ${{ secrets.GCP_REGION }} --quiet || true
           gcloud run jobs create checkout-migrate-${{ github.run_number }} \
             --image $IMAGE \
             --region ${{ secrets.GCP_REGION }} \
